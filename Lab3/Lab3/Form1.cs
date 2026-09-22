@@ -1,23 +1,22 @@
+using System;
+using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Drawing.Text;
+using System.IO;
+using System.Windows.Forms;
 
 namespace Lab3
 {
     public partial class Form1 : Form
     {
-        // файл в bin\Debug\net9.0-windows\strings.txt
-        private readonly string filePath =
-            Path.Combine(Application.StartupPath, "strings.txt");
+        private readonly string _filePath =
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "strings.txt");
+
+        private string[] _lines = Array.Empty<string>();
 
         public Form1()
         {
             InitializeComponent();
-
-            buttonWrite.Click += buttonWrite_Click!;
-            buttonDisplay.Click += buttonDisplay_Click!;
-            buttonClear.Click += buttonClear_Click!;
-
-            pictureBox1.BackColor = Color.White;
+            DoubleBuffered = true;
         }
 
         private void buttonWrite_Click(object sender, EventArgs e)
@@ -35,168 +34,163 @@ namespace Lab3
                 "Ninth line",
                 "Tenth line",
                 "Eleventh line",
-                "Twelfth line",
-                "Thirteenth line",
-                "Fourteenth line",
-                "Fifteenth line"
+                "Twelfth line"
             };
 
-            File.WriteAllLines(filePath, lines);
+            File.WriteAllLines(_filePath, lines);
+            _lines = lines;
+
+            drawingPanel.Invalidate();
 
             MessageBox.Show(
-                "Строки записаны в файл.",
-                "Готово",
+                "Файл успешно создан и записан.",
+                "Запись в файл",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
 
         private void buttonDisplay_Click(object sender, EventArgs e)
         {
-            if (!File.Exists(filePath))
+            if (!File.Exists(_filePath))
             {
                 MessageBox.Show(
-                    "Сначала нажмите «Запись в файл».",
-                    "Ошибка",
+                    "Сначала создайте файл кнопкой «Запись в файл».",
+                    "Файл не найден",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
-
                 return;
             }
 
-            string[] lines = File.ReadAllLines(filePath);
+            _lines = File.ReadAllLines(_filePath);
 
-            Bitmap bitmap = new Bitmap(
-                pictureBox1.Width,
-                pictureBox1.Height);
-
-            using (Graphics graphics = Graphics.FromImage(bitmap))
+            if (_lines.Length < 12)
             {
-                graphics.Clear(Color.White);
-
-                graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                graphics.TextRenderingHint = TextRenderingHint.AntiAlias;
-
-                DrawFirstGroup(graphics, lines);
-                DrawSecondGroup(graphics, lines);
-                DrawThirdGroup(graphics, lines);
+                MessageBox.Show(
+                    "В файле должно находиться не менее 12 строк.",
+                    "Ошибка",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
             }
 
-            Image? oldImage = pictureBox1.Image;
-
-            pictureBox1.Image = bitmap;
-
-            oldImage?.Dispose();
-        }
-
-        private void DrawFirstGroup(Graphics graphics, string[] lines)
-        {
-            using Font font = new Font(
-                "Calibri",
-                36,
-                FontStyle.Strikeout);
-
-            using StringFormat format = new StringFormat
-            {
-                Alignment = StringAlignment.Near,
-                LineAlignment = StringAlignment.Near,
-                FormatFlags = StringFormatFlags.DirectionVertical
-            };
-
-            RectangleF rectangle = new RectangleF(
-                10,
-                10,
-                170,
-                280);
-
-            string text = string.Join(
-                Environment.NewLine,
-                lines[0..6]);
-
-            graphics.DrawString(
-                text,
-                font,
-                Brushes.Black,
-                rectangle,
-                format);
-        }
-
-        private void DrawSecondGroup(Graphics graphics, string[] lines)
-        {
-            using Font font = new Font(
-                "Consolas",
-                24,
-                FontStyle.Bold);
-
-            using StringFormat format = new StringFormat
-            {
-                Alignment = StringAlignment.Far,
-                LineAlignment = StringAlignment.Near
-            };
-
-            RectangleF rectangle = new RectangleF(
-                190,
-                10,
-                480,
-                240);
-
-            string text = string.Join(
-                Environment.NewLine,
-                lines[6..11]);
-
-            graphics.DrawString(
-                text,
-                font,
-                Brushes.Black,
-                rectangle,
-                format);
-        }
-
-        private void DrawThirdGroup(Graphics graphics, string[] lines)
-        {
-            using Font font = new Font(
-                "Corbel",
-                0.5f,
-                FontStyle.Underline,
-                GraphicsUnit.Inch);
-
-            using StringFormat format = new StringFormat
-            {
-                Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Near
-            };
-
-            RectangleF rectangle = new RectangleF(
-                170,
-                270,
-                500,
-                300);
-
-            string text = string.Join(
-                Environment.NewLine,
-                lines[11..15]);
-
-            graphics.DrawString(
-                text,
-                font,
-                Brushes.Black,
-                rectangle,
-                format);
+            drawingPanel.Invalidate();
         }
 
         private void buttonClear_Click(object sender, EventArgs e)
         {
-            Image? oldImage = pictureBox1.Image;
-
-            pictureBox1.Image = null;
-
-            oldImage?.Dispose();
+            _lines = Array.Empty<string>();
+            drawingPanel.Invalidate();
         }
 
-        protected override void OnFormClosed(FormClosedEventArgs e)
+        private void drawingPanel_Paint(object sender, PaintEventArgs e)
         {
-            pictureBox1.Image?.Dispose();
+            Graphics graphics = e.Graphics;
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            graphics.TextRenderingHint =
+                System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
-            base.OnFormClosed(e);
+            graphics.Clear(Color.LightCyan);
+
+            if (_lines.Length < 12)
+            {
+                return;
+            }
+
+            // Группа 1: строки 1–6
+            // Calibri, Strikeout, 36 pt, вертикальное направление,
+            // выравнивание Near / Near.
+            using (Font font1 = new Font(
+                "Calibri",
+                36f,
+                FontStyle.Strikeout,
+                GraphicsUnit.Point))
+            using (StringFormat format1 = new StringFormat())
+            {
+                format1.Alignment = StringAlignment.Near;
+                format1.LineAlignment = StringAlignment.Near;
+                format1.FormatFlags = StringFormatFlags.DirectionVertical;
+
+                float x = 8f;
+
+                for (int i = 0; i < 6; i++)
+                {
+                    RectangleF area = new RectangleF(
+                        x,
+                        8f,
+                        48f,
+                        drawingPanel.ClientSize.Height - 16f);
+
+                    graphics.DrawString(
+                        _lines[i],
+                        font1,
+                        Brushes.Black,
+                        area,
+                        format1);
+
+                    x += 42f;
+                }
+            }
+
+            // Группа 2: строки 7–11
+            // Consolas, Bold, 24 pt, горизонтальное направление,
+            // выравнивание Far / Near.
+            using (Font font2 = new Font(
+                "Consolas",
+                24f,
+                FontStyle.Bold,
+                GraphicsUnit.Point))
+            using (StringFormat format2 = new StringFormat())
+            {
+                format2.Alignment = StringAlignment.Far;
+                format2.LineAlignment = StringAlignment.Near;
+
+                float y = 8f;
+
+                for (int i = 6; i < 11; i++)
+                {
+                    RectangleF area = new RectangleF(
+                        310f,
+                        y,
+                        Math.Max(100f, drawingPanel.ClientSize.Width - 325f),
+                        35f);
+
+                    graphics.DrawString(
+                        _lines[i],
+                        font2,
+                        Brushes.Blue,
+                        area,
+                        format2);
+
+                    y += 39f;
+                }
+            }
+
+            // Группа 3: строка 12
+            // Corbel, Underline, 0.5 inch = 36 pt, горизонтальное направление,
+            // выравнивание Center / Near.
+            using (Font font3 = new Font(
+                "Corbel",
+                36f,
+                FontStyle.Underline,
+                GraphicsUnit.Point))
+            using (StringFormat format3 = new StringFormat())
+            {
+                format3.Alignment = StringAlignment.Center;
+                format3.LineAlignment = StringAlignment.Near;
+
+                RectangleF area = new RectangleF(
+                    250f,
+                    225f,
+                    Math.Max(200f, drawingPanel.ClientSize.Width - 300f),
+                    55f);
+
+                graphics.DrawString(
+                    _lines[11],
+                    font3,
+                    Brushes.Green,
+                    area,
+                    format3);
+            }
         }
     }
 }

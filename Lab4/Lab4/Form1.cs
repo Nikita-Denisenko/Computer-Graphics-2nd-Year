@@ -1,275 +1,139 @@
+using System;
+using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Windows.Forms;
 
 namespace Lab4
 {
     public partial class Form1 : Form
     {
+        private const string DragonFormula = "110110011100100";
+        private const float Step = 35f;
+
         public Form1()
         {
             InitializeComponent();
-
-            pictureBox1.BackColor = Color.White;
         }
 
-        private void buttonDraw_Click(object sender, EventArgs e)
+        private void Form1_Paint(object sender, PaintEventArgs e)
         {
-            Bitmap bitmap = new Bitmap(
-                pictureBox1.Width,
-                pictureBox1.Height);
+            Graphics g = e.Graphics;
 
-            using (Graphics graphics = Graphics.FromImage(bitmap))
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(Color.White);
+
+            PointF[] points = BuildDragon();
+
+            using (Pen dragonPen = new Pen(Color.Black, 3f))
+            using (Pen headPen = new Pen(Color.Black, 20f))
             {
-                graphics.Clear(Color.White);
-                graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                // Кривая дракона — прерывистая линия.
+                dragonPen.DashStyle = DashStyle.Dash;
 
-                DrawDragon(graphics);
+                // Голова — комбинированное перо.
+                headPen.CompoundArray = new float[]
+                {
+                    0.0f, 0.20f,
+                    0.35f, 0.65f,
+                    0.80f, 1.0f
+                };
+
+                for (int i = 0; i < points.Length - 2; i++)
+                {
+                    g.DrawLine(
+                        dragonPen,
+                        points[i],
+                        points[i + 1]);
+                }
+
+                // Последний отрезок является головой.
+                g.DrawLine(
+                    headPen,
+                    points[points.Length - 2],
+                    points[points.Length - 1]);
             }
-
-            Image? oldImage = pictureBox1.Image;
-            pictureBox1.Image = bitmap;
-
-            oldImage?.Dispose();
         }
 
-        private void DrawDragon(Graphics graphics)
+        private PointF[] BuildDragon()
         {
-            string formula = "110110011100100";
+            PointF[] points = new PointF[DragonFormula.Length + 1];
 
-            float length = 50;
-            float x = 0;
-            float y = 0;
-            double angle = 0;
-
-            PointF[] points = new PointF[formula.Length + 1];
+            float angle = 0f;
+            float x = 0f;
+            float y = 0f;
 
             points[0] = new PointF(x, y);
 
-            for (int i = 0; i < formula.Length; i++)
+            for (int i = 0; i < DragonFormula.Length; i++)
             {
-                double radians = angle * Math.PI / 180.0;
-
-                x += (float)(Math.Cos(radians) * length);
-                y += (float)(Math.Sin(radians) * length);
+                x += Step * (float)Math.Cos(angle * Math.PI / 180f);
+                y += Step * (float)Math.Sin(angle * Math.PI / 180f);
 
                 points[i + 1] = new PointF(x, y);
 
-                if (i < formula.Length - 1)
-                {
-                    if (formula[i] == '1')
-                    {
-                        angle -= 90;
-                    }
-                    else
-                    {
-                        angle += 90;
-                    }
-                }
+                if (DragonFormula[i] == '1')
+                    angle += 90f;
+                else
+                    angle -= 90f;
             }
 
-            PointF tail = points[0];
-            PointF head = points[^1];
+            float dx = points[points.Length - 1].X - points[0].X;
+            float dy = points[points.Length - 1].Y - points[0].Y;
 
-            float dx = head.X - tail.X;
-            float dy = head.Y - tail.Y;
+            float rotation =
+                (float)(-Math.Atan2(dy, dx) * 180.0 / Math.PI);
 
-            double dragonAngle =
-                Math.Atan2(dy, dx) * 180.0 / Math.PI;
+            float radians = rotation * (float)Math.PI / 180f;
 
-            double rotation = -dragonAngle;
-
-            double rotationRadians =
-                rotation * Math.PI / 180.0;
-
-            float cos = (float)Math.Cos(rotationRadians);
-            float sin = (float)Math.Sin(rotationRadians);
+            float cos = (float)Math.Cos(radians);
+            float sin = (float)Math.Sin(radians);
 
             for (int i = 0; i < points.Length; i++)
             {
-                float rotatedX =
-                    points[i].X * cos -
-                    points[i].Y * sin;
-
-                float rotatedY =
-                    points[i].X * sin +
-                    points[i].Y * cos;
+                float oldX = points[i].X;
+                float oldY = points[i].Y;
 
                 points[i] = new PointF(
-                    rotatedX,
-                    rotatedY);
+                    oldX * cos - oldY * sin,
+                    oldX * sin + oldY * cos);
             }
 
-            float minX = points.Min(p => p.X);
-            float maxX = points.Max(p => p.X);
-            float minY = points.Min(p => p.Y);
-            float maxY = points.Max(p => p.Y);
+            float minX = points[0].X;
+            float maxX = points[0].X;
+            float minY = points[0].Y;
+            float maxY = points[0].Y;
 
-            float dragonCenterX =
-                (minX + maxX) / 2f;
+            foreach (PointF point in points)
+            {
+                minX = Math.Min(minX, point.X);
+                maxX = Math.Max(maxX, point.X);
+                minY = Math.Min(minY, point.Y);
+                maxY = Math.Max(maxY, point.Y);
+            }
 
-            float dragonCenterY =
-                (minY + maxY) / 2f;
+            float scale = Math.Min(
+                (ClientSize.Width - 100f) /
+                Math.Max(maxX - minX, 1f),
 
-            float pictureCenterX =
-                pictureBox1.Width / 2f;
+                (ClientSize.Height - 100f) /
+                Math.Max(maxY - minY, 1f));
 
-            float pictureCenterY =
-                pictureBox1.Height / 2f;
+            scale = Math.Min(scale, 1.8f);
 
-            float offsetX =
-                pictureCenterX - dragonCenterX;
-
-            float offsetY =
-                pictureCenterY - dragonCenterY;
+            float centerX = ClientSize.Width / 2f;
+            float centerY = ClientSize.Height / 2f;
 
             for (int i = 0; i < points.Length; i++)
             {
                 points[i] = new PointF(
-                    points[i].X + offsetX,
-                    points[i].Y + offsetY);
+                    centerX +
+                    (points[i].X - (minX + maxX) / 2f) * scale,
+
+                    centerY +
+                    (points[i].Y - (minY + maxY) / 2f) * scale);
             }
 
-            using Pen dragonPen =
-                new Pen(Color.Black, 3);
-
-            dragonPen.DashStyle =
-                DashStyle.Dash;
-
-            graphics.DrawLines(
-                dragonPen,
-                points);
-
-            PointF finalHead = points[^1];
-
-            double finalAngle =
-                angle + rotation;
-
-            DrawHead(
-                graphics,
-                finalHead,
-                finalAngle);
-        }
-
-        private void DrawHead(
-            Graphics graphics,
-            PointF position,
-            double angle)
-        {
-            using Pen headPen =
-                new Pen(Color.Black, 3);
-
-            headPen.DashStyle =
-                DashStyle.DashDot;
-
-            double radians =
-                angle * Math.PI / 180.0;
-
-            float headLength = 30;
-            float headWidth = 20;
-
-            PointF direction = new PointF(
-                (float)Math.Cos(radians),
-                (float)Math.Sin(radians));
-
-            PointF perpendicular = new PointF(
-                -direction.Y,
-                direction.X);
-
-            PointF nose = new PointF(
-                position.X +
-                direction.X * headLength,
-
-                position.Y +
-                direction.Y * headLength);
-
-            PointF upper = new PointF(
-                position.X +
-                perpendicular.X * headWidth / 2,
-
-                position.Y +
-                perpendicular.Y * headWidth / 2);
-
-            PointF lower = new PointF(
-                position.X -
-                perpendicular.X * headWidth / 2,
-
-                position.Y -
-                perpendicular.Y * headWidth / 2);
-
-            graphics.DrawLine(
-                headPen,
-                upper,
-                nose);
-
-            graphics.DrawLine(
-                headPen,
-                nose,
-                lower);
-
-            graphics.DrawLine(
-                headPen,
-                lower,
-                upper);
-
-            PointF mouthStart = new PointF(
-                nose.X -
-                direction.X * 10 +
-                perpendicular.X * 5,
-
-                nose.Y -
-                direction.Y * 10 +
-                perpendicular.Y * 5);
-
-            PointF mouthEnd = new PointF(
-                nose.X -
-                direction.X * 10 -
-                perpendicular.X * 5,
-
-                nose.Y -
-                direction.Y * 10 -
-                perpendicular.Y * 5);
-
-            graphics.DrawLine(
-                headPen,
-                mouthStart,
-                mouthEnd);
-
-            PointF eye = new PointF(
-                position.X +
-                direction.X * 12 +
-                perpendicular.X * 5,
-
-                position.Y +
-                direction.Y * 12 +
-                perpendicular.Y * 5);
-
-            using Brush brush =
-                new SolidBrush(Color.Black);
-
-            graphics.FillEllipse(
-                brush,
-                eye.X - 2,
-                eye.Y - 2,
-                4,
-                4);
-        }
-
-        private void buttonClear_Click(
-            object sender,
-            EventArgs e)
-        {
-            Image? oldImage = pictureBox1.Image;
-
-            pictureBox1.Image = null;
-
-            oldImage?.Dispose();
-        }
-
-        protected override void OnFormClosed(
-            FormClosedEventArgs e)
-        {
-            pictureBox1.Image?.Dispose();
-
-            base.OnFormClosed(e);
+            return points;
         }
     }
 }
